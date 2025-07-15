@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Operações</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Painel de Operações</h1>
+    </header>
+
+    <main>
+        <div id="visao-mestra">
+            <div class="summary-container" id="summary-cards"></div>
+
+            <div class="control-bar">
+                <div class="search-filter">
+                    <input type="text" id="filtro-geral" placeholder="Buscar por Motorista ou Mapa...">
+                </div>
+                <div class="tabs-filter">
+                    <button id="tab-andamento" class="tab-btn active">Rotas em Andamento</button>
+                    <button id="tab-finalizadas" class="tab-btn">Rotas Finalizadas</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Motorista</th>
+                            <th>Mapa (ID)</th>
+                            <th>Progresso</th>
+                            <th>Status da Rota</th>
+                            <th>Devoluções</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tours-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="visao-detalhe" class="hidden">
+            <button id="btn-voltar">← Voltar para Visão Geral</button>
+            <h2 id="stops-title">Detalhes da Rota</h2>
+            <ul id="stops-list"></ul>
+        </div>
+    </main>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="clientes.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
