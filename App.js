@@ -11,7 +11,6 @@ const visaoDetalheContainer = document.getElementById('visao-detalhe');
 const stopsListElement = document.getElementById('stops-list');
 const stopsTitleElement = document.getElementById('stops-title');
 const btnVoltar = document.getElementById('btn-voltar');
-
 const filtroGeralInput = document.getElementById('filtro-geral');
 const tabAndamento = document.getElementById('tab-andamento');
 const tabFinalizadas = document.getElementById('tab-finalizadas');
@@ -149,7 +148,6 @@ function mostrarVisaoDetalhe(tourId, driverName) { visaoMestraContainer.classLis
 async function inicializarPainel() {
     toursTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando dados...</td></tr>';
     
-    // Na inicialização, sempre buscamos todos os dados, sem filtro de data
     const [toursRes, stopsRes] = await Promise.all([
         supabaseClient.from("tours").select("*"),
         supabaseClient.from("stops").select("*")
@@ -178,7 +176,7 @@ function ouvirMudancas() {
 // --- 6. INICIALIZAÇÃO E EVENTOS ---
 document.addEventListener('DOMContentLoaded', () => {
     btnVoltar.addEventListener('click', mostrarVisaoMestra);
-    filtroGeralInput.addEventListener('keyup', renderizarTabelaDeTours);
+    filtroGeralInput.addEventListener('keyup', renderizarTabelaDeTours); 
 
     tabAndamento.addEventListener('click', () => {
         abaAtiva = 'andamento';
@@ -194,6 +192,12 @@ document.addEventListener('DOMContentLoaded', () => {
         renderizarTabelaDeTours();
     });
 
-    inicializarPainel();
-    ouvirMudancas();
+    inicializarPainel(); // Carga inicial
+    ouvirMudancas();   // Escuta em tempo real
+
+    // NOVO: Adiciona um temporizador para atualizar tudo a cada 10 minutos
+    setInterval(() => {
+        console.log("Executando atualização automática de 10 minutos...");
+        inicializarPainel();
+    }, 600000); // 10 minutos = 600,000 milissegundos
 });
