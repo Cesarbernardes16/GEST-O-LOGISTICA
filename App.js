@@ -19,8 +19,7 @@ const tabFinalizadas = document.getElementById('tab-finalizadas');
 let todosOsTours = [];
 let todasAsParadas = [];
 let abaAtiva = 'andamento';
-// Opcional: Adicionar um mapa de clientes se for carregar os nomes
-let clientesMap = {}; 
+// A variável 'clientesMap' é carregada pelo arquivo clientes.js e não precisa ser declarada aqui.
 
 // --- 4. FUNÇÕES DE RENDERIZAÇÃO E LÓGICA ---
 
@@ -44,75 +43,64 @@ function renderizarCartoesDeResumo(tours, paradas) {
 }
 
 function renderizarTabelaDeTours() {
-    toursTableBody.innerHTML = ''; 
-    const termoBusca = filtroGeralInput.value.toLowerCase().trim();
+    toursTableBody.innerHTML = '';
+    const termoBusca = filtroGeralInput.value.toLowerCase().trim();
 
-    // ===== INÍCIO DA MODIFICAÇÃO =====
-    let toursParaExibir = todosOsTours.filter(tour => {
-        // 1. Pesquisa por nome do motorista e ID do mapa
-        const textoTour = `${tour.driver_name.toLowerCase()} ${tour.id}`;
-        if (textoTour.includes(termoBusca)) {
-            return true; // Se encontrar, já retorna true e inclui a rota
-        }
-
-        // 2. Pesquisa por códigos de cliente dentro das paradas da rota
+    let toursProcessados = todosOsTours.map(tour => {
         const paradasDoTour = todasAsParadas.filter(p => p.tour_id === tour.id);
-        const clienteEncontrado = paradasDoTour.some(parada => 
-            parada.customer_id && String(parada.customer_id).toLowerCase().includes(termoBusca)
-        );
+        const concluidas = paradasDoTour.filter(p => p.finished_time).length;
+        const devolucoes = paradasDoTour.filter(p => p.status === 'RESCHEDULED').length;
+        const totalParadas = tour.total_stops;
+        const isFinalizada = totalParadas > 0 && (concluidas + devolucoes === totalParadas);
+        
+        const codigosClientes = paradasDoTour.map(p => p.customer_id).join(' ');
+        const textoPesquisa = `${tour.driver_name.toLowerCase()} ${tour.id} ${codigosClientes}`;
 
-        return clienteEncontrado;
+        return { tour, paradas: paradasDoTour, concluidas, devolucoes, totalParadas, isFinalizada, textoPesquisa, temDevolucao: devolucoes > 0 };
     });
-    // ===== FIM DA MODIFICAÇÃO =====
 
-    toursParaExibir = toursParaExibir.filter(tour => {
-        const paradasDoTour = todasAsParadas.filter(p => p.tour_id === tour.id);
-        const concluidas = paradasDoTour.filter(p => p.finished_time).length;
-        const devolucoes = paradasDoTour.filter(p => p.status === 'RESCHEDULED').length;
-        const totalParadas = tour.total_stops;
-        const isFinalizada = totalParadas > 0 && (concluidas + devolucoes === totalParadas);
+    let toursParaExibir = toursProcessados
+        .filter(item => item.textoPesquisa.toLowerCase().includes(termoBusca))
+        .filter(item => {
+            if (abaAtiva === 'andamento') return !item.isFinalizada;
+            if (abaAtiva === 'finalizadas') return item.isFinalizada;
+            return true;
+        });
 
-        if (abaAtiva === 'andamento') return !isFinalizada;
-        if (abaAtiva === 'finalizadas') return isFinalizada;
-        return true;
-    });
+    toursParaExibir.sort((a, b) => {
+        if (a.temDevolucao && !b.temDevolucao) return -1;
+        if (!a.temDevolucao && b.temDevolucao) return 1;
+        return new Date(a.tour.tour_date) - new Date(b.tour.tour_date);
+    });
+    
+    if (toursParaExibir.length === 0) {
+        toursTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhuma rota encontrada.</td></tr>';
+        return;
+    }
 
-    toursParaExibir.sort((a, b) => {
-        const aTemDevolucao = todasAsParadas.some(p => p.tour_id === a.id && p.status === 'RESCHEDULED');
-        const bTemDevolucao = todasAsParadas.some(p => p.tour_id === b.id && p.status === 'RESCHEDULED');
-        if (aTemDevolucao && !bTemDevolucao) return -1;
-        if (!aTemDevolucao && bTemDevolucao) return 1;
-        return new Date(a.tour_date) - new Date(b.tour_date);
-    });
-    
-    if (toursParaExibir.length === 0) {
-        toursTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhuma rota encontrada.</td></tr>';
-        return;
-    }
+    for (const item of toursParaExibir) {
+        const { tour, concluidas, totalParadas, devolucoes, isFinalizada } = item;
 
-    for (const tour of toursParaExibir) {
-        const paradasDoTour = todasAsParadas.filter(p => p.tour_id === tour.id);
-        const concluidas = paradasDoTour.filter(p => p.finished_time).length;
-        const total = tour.total_stops;
-        const devolucoes = paradasDoTour.filter(p => p.status === 'RESCHEDULED').length;
-        let statusClass = 'status-em-rota', statusText = 'Em Rota';
-        if (total > 0 && concluidas + devolucoes === total) { statusClass = 'status-finalizado'; statusText = 'Finalizado'; }
-        if (devolucoes > 0) { statusClass = 'status-critico'; }
-        const dataFormatada = new Date(tour.tour_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
-        const barraDeProgressoHTML = criarBarraDeProgresso(concluidas, total);
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${tour.driver_name}</td><td>${tour.id}<br><small>${dataFormatada}</small></td><td><span>${concluidas} de ${total}</span>${barraDeProgressoHTML}</td><td><span class="status-badge ${statusClass}">${statusText}</span></td><td>${devolucoes}</td><td><button class="btn-detalhes" data-tour-id="${tour.id}" data-driver-name="${tour.driver_name}">Ver Detalhes</button></td>`;
-        toursTableBody.appendChild(tr);
-    }
-    
-    document.querySelectorAll(".btn-detalhes").forEach(btn => {
-        btn.addEventListener("click", e => {
-            const tourId = e.target.dataset.tourId;
-            const driverName = e.target.dataset.driverName;
-            mostrarVisaoDetalhe(tourId, driverName);
-        });
-    });
+        let statusClass = 'status-em-rota', statusText = 'Em Rota';
+        if (isFinalizada) { statusClass = 'status-finalizado'; statusText = 'Finalizado'; }
+        if (devolucoes > 0) { statusClass = 'status-critico'; }
+
+        const dataFormatada = new Date(tour.tour_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        const barraDeProgressoHTML = criarBarraDeProgresso(concluidas, totalParadas);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${tour.driver_name}</td><td>${tour.id}<br><small>${dataFormatada}</small></td><td><span>${concluidas} de ${totalParadas}</span>${barraDeProgressoHTML}</td><td><span class="status-badge ${statusClass}">${statusText}</span></td><td>${devolucoes}</td><td><button class="btn-detalhes" data-tour-id="${tour.id}" data-driver-name="${tour.driver_name}">Ver Detalhes</button></td>`;
+        toursTableBody.appendChild(tr);
+    }
+    
+    document.querySelectorAll(".btn-detalhes").forEach(btn => {
+        btn.addEventListener("click", e => {
+            const tourId = e.target.dataset.tourId;
+            const driverName = e.target.dataset.driverName;
+            mostrarVisaoDetalhe(tourId, driverName);
+        });
+    });
 }
+
 
 function criarBarraDeProgresso(concluidas, total) {
     const porcentagem = total > 0 ? (concluidas / total) * 100 : 0;
@@ -207,12 +195,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderizarTabelaDeTours();
     });
 
-    inicializarPainel(); // Carga inicial
-    ouvirMudancas();   // Escuta em tempo real
+    inicializarPainel();
+    ouvirMudancas();
 
-    // NOVO: Adiciona um temporizador para atualizar tudo a cada 10 minutos
     setInterval(() => {
         console.log("Executando atualização automática de 10 minutos...");
         inicializarPainel();
-    }, 600000); // 10 minutos = 600,000 milissegundos
+    }, 600000);
 });
