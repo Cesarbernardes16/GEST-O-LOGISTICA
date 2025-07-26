@@ -59,7 +59,7 @@ function renderizarTabelaDeTours() {
         const textoPesquisa = `${tour.driver_name.toLowerCase()} ${tour.id} ${codigosClientes}`;
         
         // Verifica se o ID do mapa (tour.id) está na lista de mapas que precisam de empilhadeira
-        const precisaEmpilhadeira = mapasComEmpilhadeira.has(tour.id);
+        const precisaEmpilhadeira = mapasComEmpilhadeira.has(Number(tour.id));
 
         return { tour, concluidas, devolucoes, totalParadas, isFinalizada, textoPesquisa, temDevolucao: devolucoes > 0, precisaEmpilhadeira };
     });
@@ -69,7 +69,7 @@ function renderizarTabelaDeTours() {
         .filter(item => {
             if (abaAtiva === 'andamento') return !item.isFinalizada;
             if (abaAtiva === 'finalizadas') return item.isFinalizada;
-            if (abaAtiva === 'empilhadeira') return item.precisaEmpilhadeira; // Filtro correto
+            if (abaAtiva === 'empilhadeira') return item.precisaEmpilhadeira;
             return true;
         });
 
@@ -180,7 +180,8 @@ async function inicializarPainel() {
     
     // Processa os mapas com empilhadeira e armazena em um Set para acesso rápido
     if (empilhadeiraRes.data) {
-        mapasComEmpilhadeira = new Set(empilhadeiraRes.data.map(item => item['Nro do Mapa']));
+        // CORREÇÃO: Garante que os IDs do mapa sejam armazenados como NÚMEROS
+        mapasComEmpilhadeira = new Set(empilhadeiraRes.data.map(item => Number(item['Nro do Mapa'])));
     }
 
     renderizarCartoesDeResumo(todosOsTours, todasAsParadas);
