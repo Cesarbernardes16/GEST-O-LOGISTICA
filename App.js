@@ -19,7 +19,8 @@ const tabEmpilhadeira = document.getElementById('tab-empilhadeira');
 // --- 3. ESTADO DA APLICAÇÃO ---
 let todosOsTours = [];
 let todasAsParadas = [];
-let mapasComEmpilhadeira = new Set(); // Armazena os IDs dos mapas que precisam de empilhadeira
+let mapasComEmpilhadeira = new Set(); // Armazena os IDs dos MAPAS que precisam de empilhadeira
+let clientesComEmpilhadeira = new Set(); // Armazena os IDs dos CLIENTES que precisam de empilhadeira
 let abaAtiva = 'andamento';
 // A variável 'clientesMap' é carregada pelo arquivo clientes.js
 
@@ -58,7 +59,6 @@ function renderizarTabelaDeTours() {
         const codigosClientes = paradasDoTour.map(p => p.customer_id).join(' ');
         const textoPesquisa = `${tour.driver_name.toLowerCase()} ${tour.id} ${codigosClientes}`;
         
-        // Verifica se o ID do mapa (tour.id) está na lista de mapas que precisam de empilhadeira
         const precisaEmpilhadeira = mapasComEmpilhadeira.has(Number(tour.id));
 
         return { tour, concluidas, devolucoes, totalParadas, isFinalizada, textoPesquisa, temDevolucao: devolucoes > 0, precisaEmpilhadeira };
@@ -91,7 +91,7 @@ function renderizarTabelaDeTours() {
         if (isFinalizada) { statusClass = 'status-finalizado'; statusText = 'Finalizado'; }
         if (devolucoes > 0) { statusClass = 'status-critico'; }
 
-        const empilhadeiraIcon = precisaEmpilhadeira ? ' 🚚' : ''; // Ícone para empilhadeira
+        const empilhadeiraIcon = precisaEmpilhadeira ? ' 🚚' : '';
         const dataFormatada = new Date(tour.tour_date).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
         const barraDeProgressoHTML = criarBarraDeProgresso(concluidas, totalParadas);
         const tr = document.createElement('tr');
@@ -107,7 +107,6 @@ function renderizarTabelaDeTours() {
         });
     });
 }
-
 
 function criarBarraDeProgresso(concluidas, total) {
     const porcentagem = total > 0 ? (concluidas / total) * 100 : 0;
@@ -129,6 +128,7 @@ function renderizarDetalhesDasParadas(tourId, driverName) {
     stopsListElement.innerHTML = "";
     const paradasConcluidas = paradasDoTour.filter(s => s.finished_time);
     const maiorParadaConcluida = paradasConcluidas.length > 0 ? Math.max(...paradasConcluidas.map(s => s.visit_order)) : 0;
+
     for (const stop of paradasDoTour) {
         let statusClass = 'pendente', statusText = stop.status, isCritical = false, criticalIcon = '';
         if (stop.finished_time) { statusClass = 'finalizada'; statusText = 'FINALIZADA'; } 
@@ -148,10 +148,16 @@ function renderizarDetalhesDasParadas(tourId, driverName) {
             criticalIcon = ' ⚠️'; 
         }
 
+        // **ALTERAÇÃO AQUI**: Verifica se o cliente específico precisa de empilhadeira
+        const precisaEmpilhadeira = clientesComEmpilhadeira.has(Number(stop.customer_id));
+        const empilhadeiraIcon = precisaEmpilhadeira ? ' 🚚' : '';
+
         const nomeCliente = clientesMap[stop.customer_id] || `Cliente Desconhecido`;
         const li = document.createElement('li');
         if(isCritical) li.classList.add('parada-critica');
-        li.innerHTML = `<div><strong>Parada ${stop.visit_order}:</strong> Cliente: ${nomeCliente}${criticalIcon}<br><small>Código: ${stop.customer_id}</small><br><small>Chegada: ${stop.arrived_time ? new Date(stop.arrived_time).toLocaleTimeString('pt-BR') : '---'} | Finalizado: ${stop.finished_time ? new Date(stop.finished_time).toLocaleTimeString('pt-BR') : '---'}</small></div><span class="status-badge status-${statusClass}">${statusText}</span>`;
+        
+        // **ALTERAÇÃO AQUI**: Adiciona o ícone APENAS ao lado do cliente que precisa
+        li.innerHTML = `<div><strong>Parada ${stop.visit_order}:</strong> Cliente: ${nomeCliente}${empilhadeiraIcon}${criticalIcon}<br><small>Código: ${stop.customer_id}</small><br><small>Chegada: ${stop.arrived_time ? new Date(stop.arrived_time).toLocaleTimeString('pt-BR') : '---'} | Finalizado: ${stop.finished_time ? new Date(stop.finished_time).toLocaleTimeString('pt-BR') : '---'}</small></div><span class="status-badge status-${statusClass}">${statusText}</span>`;
         stopsListElement.appendChild(li);
     }
 }
@@ -162,12 +168,11 @@ function mostrarVisaoDetalhe(tourId, driverName) { visaoMestraContainer.classLis
 async function inicializarPainel() {
     toursTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando dados...</td></tr>';
     
-    // Busca os dados em paralelo
+    // **ALTERAÇÃO AQUI**: Busca também a coluna "CLIENTE" da tabela Tours2
     const [toursRes, stopsRes, empilhadeiraRes] = await Promise.all([
         supabaseClient.from("tours").select("*"),
         supabaseClient.from("stops").select("*"),
-        // Busca na tabela Tours2 para identificar os mapas que precisam de empilhadeira
-        supabaseClient.from("Tours2").select('"Nro do Mapa"')
+        supabaseClient.from("Tours2").select('"Nro do Mapa", "CLIENTE"')
     ]);
 
     if (toursRes.error || stopsRes.error || empilhadeiraRes.error) {
@@ -178,10 +183,10 @@ async function inicializarPainel() {
     todosOsTours = toursRes.data;
     todasAsParadas = stopsRes.data;
     
-    // Processa os mapas com empilhadeira e armazena em um Set para acesso rápido
+    // **ALTERAÇÃO AQUI**: Processa tanto os mapas quanto os clientes com empilhadeira
     if (empilhadeiraRes.data) {
-        // CORREÇÃO: Garante que os IDs do mapa sejam armazenados como NÚMEROS
         mapasComEmpilhadeira = new Set(empilhadeiraRes.data.map(item => Number(item['Nro do Mapa'])));
+        clientesComEmpilhadeira = new Set(empilhadeiraRes.data.map(item => Number(item['CLIENTE'])));
     }
 
     renderizarCartoesDeResumo(todosOsTours, todasAsParadas);
@@ -201,7 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
     btnVoltar.addEventListener('click', mostrarVisaoMestra);
     filtroGeralInput.addEventListener('keyup', renderizarTabelaDeTours); 
 
-    // Função para gerenciar a classe 'active' das abas
     function atualizarAbasAtivas(abaClicada) {
         [tabAndamento, tabFinalizadas, tabEmpilhadeira].forEach(tab => {
             tab.classList.remove('active');
